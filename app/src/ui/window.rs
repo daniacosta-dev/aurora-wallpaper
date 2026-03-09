@@ -82,7 +82,9 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     let stack_clone = stack.clone();
 
     import_btn.connect_clicked(move |_| {
-        let Some(win) = window_weak.upgrade() else { return };
+        let Some(win) = window_weak.upgrade() else {
+            return;
+        };
 
         let filter = gtk::FileFilter::new();
         filter.set_name(Some("Video files"));
@@ -150,11 +152,7 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
 ///
 /// Takes the full `Rc<RefCell<AppState>>` so it can also wire up
 /// the remove callback for each new card.
-fn refresh_list(
-    list_box: &gtk::ListBox,
-    stack: &gtk::Stack,
-    state: &Rc<RefCell<AppState>>,
-) {
+fn refresh_list(list_box: &gtk::ListBox, stack: &gtk::Stack, state: &Rc<RefCell<AppState>>) {
     while let Some(child) = list_box.first_child() {
         list_box.remove(&child);
     }
@@ -174,18 +172,51 @@ fn refresh_list(
         let stack_for_card = stack.clone();
 
         let card = build_wallpaper_card(wallpaper, move |id| {
-            let storage = state_for_card.borrow().storage.clone_path();
-            let result = {
-                let mut st = state_for_card.borrow_mut();
-                remove_wallpaper(id, &mut st.library, &storage)
-            };
-            match result {
-                Ok(()) => {
-                    println!("[AuroraWall] Removed wallpaper id={id}");
-                    refresh_list(&list_for_card, &stack_for_card, &state_for_card);
+            // Nombre del wallpaper para el mensaje.
+            let name = state_for_card
+                .borrow()
+                .library
+                .get(id)
+                .map(|w| w.name.clone())
+                .unwrap_or_else(|| "this wallpaper".to_string());
+
+            let confirm = gtk::MessageDialog::new(
+                None::<&gtk::Window>,
+                gtk::DialogFlags::MODAL,
+                gtk::MessageType::Question,
+                gtk::ButtonsType::None,
+                &format!("Remove \"{}\"?", name),
+            );
+            confirm.add_button("Cancel", gtk::ResponseType::Cancel);
+            let delete_btn = confirm.add_button("Remove", gtk::ResponseType::Accept);
+            delete_btn.add_css_class("destructive-action");
+            confirm.set_secondary_text(Some(
+                "It will be removed from the library. The video file will not be deleted.",
+            ));
+
+            let state_cb = Rc::clone(&state_for_card);
+            let list_cb = list_for_card.clone();
+            let stack_cb = stack_for_card.clone();
+
+            confirm.connect_response(move |d, response| {
+                d.close();
+                if response == gtk::ResponseType::Accept {
+                    let storage = state_cb.borrow().storage.clone_path();
+                    let result = {
+                        let mut st = state_cb.borrow_mut();
+                        remove_wallpaper(id, &mut st.library, &storage)
+                    };
+                    match result {
+                        Ok(()) => {
+                            println!("[AuroraWall] Removed wallpaper id={id}");
+                            refresh_list(&list_cb, &stack_cb, &state_cb);
+                        }
+                        Err(e) => eprintln!("[AuroraWall] Remove error: {e}"),
+                    }
                 }
-                Err(e) => eprintln!("[AuroraWall] Remove error: {e}"),
-            }
+            });
+
+            confirm.show();
         });
 
         list_box.append(&card);
