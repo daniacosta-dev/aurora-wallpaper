@@ -49,6 +49,18 @@ if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc" 2>/dev/null || true
 fi
 
+# ── Icon ──────────────────────────────────────────────────────────────────────
+
+ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
+mkdir -p "$ICON_DIR"
+cp aurora-wallpaper.svg "$ICON_DIR/aurora-wallpaper.svg"
+gtk-update-icon-cache ~/.local/share/icons/hicolor/ 2>/dev/null || true
+```
+
+Y cambia en el `.desktop`:
+```
+Icon=aurora-wallpaper
+
 # ── Desktop entry ─────────────────────────────────────────────────────────────
 
 DESKTOP_DIR="$HOME/.local/share/applications"
