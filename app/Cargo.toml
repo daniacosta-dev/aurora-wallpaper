@@ -17,6 +17,7 @@ gstreamer = "0.22"
 gstreamer-app = "0.22"
 gstreamer-video = "0.22"
 png = "0.17"
+gio = { package = "gio", version = "0.19" }
 
 # Serialisation for JSON library storage.
 serde = { version = "1", features = ["derive"] }

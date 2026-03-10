@@ -1,14 +1,19 @@
 use gtk::prelude::*;
 
-use crate::domain::{WallpaperId, Wallpaper};
+use crate::domain::{Wallpaper, WallpaperId};
 
 /// Build a wallpaper card row.
 ///
 /// `on_remove` is called with the wallpaper's ID when the delete button is clicked.
 /// The caller (window.rs) owns the state and handles the actual removal.
-pub fn build_wallpaper_card<F>(wallpaper: &Wallpaper, on_remove: F) -> gtk::ListBoxRow
+pub fn build_wallpaper_card<F, G>(
+    wallpaper: &Wallpaper,
+    on_activate: F,
+    on_remove: G,
+) -> gtk::ListBoxRow
 where
-    F: Fn(WallpaperId) + 'static,
+    F: Fn(String) + 'static,
+    G: Fn(WallpaperId) + 'static,
 {
     let row = gtk::ListBoxRow::new();
     row.set_activatable(false);
@@ -63,6 +68,16 @@ where
         warn.set_halign(gtk::Align::Start);
         vbox.append(&warn);
     }
+    // Set as Wallpaper button.
+    let activate_btn = gtk::Button::with_label("Set as Wallpaper");
+    activate_btn.add_css_class("suggested-action");
+    activate_btn.add_css_class("pill");
+    activate_btn.set_valign(gtk::Align::Center);
+
+    let file_path = wallpaper.file_path.to_string_lossy().to_string();
+    activate_btn.connect_clicked(move |_| {
+        on_activate(file_path.clone());
+    });
 
     // Delete button.
     let delete_btn = gtk::Button::new();
@@ -79,6 +94,7 @@ where
 
     hbox.append(&thumb_widget);
     hbox.append(&vbox);
+    hbox.append(&activate_btn);
     hbox.append(&delete_btn);
     row.set_child(Some(&hbox));
     row
