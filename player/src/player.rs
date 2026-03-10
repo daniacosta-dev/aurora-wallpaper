@@ -245,8 +245,10 @@ fn create_mpv(wid: u64) -> Result<Mpv, String> {
         .map_err(|e| format!("mpv wid error: {e}"))?;
     mpv.set_property("loop-file", "inf")
         .map_err(|e| format!("mpv loop error: {e}"))?;
-    mpv.set_property("vo", "x11")
-        .map_err(|e| format!("mpv vo error: {e}"))?;
+    mpv.set_property("vo", "gpu")
+    .map_err(|e| format!("mpv vo error: {e}"))?;
+    mpv.set_property("hwdec", "auto")
+    .map_err(|e| format!("mpv hwdec error: {e}"))?;
     mpv.set_property("osc", false)
         .map_err(|e| format!("mpv osc error: {e}"))?;
     mpv.set_property("input-default-bindings", false)
