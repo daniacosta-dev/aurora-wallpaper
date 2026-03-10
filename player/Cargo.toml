@@ -15,9 +15,6 @@ gdk = { package = "gdk4", version = "0.8" }
 gdk-x11 = { package = "gdk4-x11", version = "0.8" }
 glib = "0.19"
 aurora-shared = { path = "../shared" }
-x11 = "2.21"
 libmpv = { version = "2.0.2-fork.1", package = "libmpv-sirno" }
 libc = "0.2"
-
-[target.'cfg(target_os = "linux")'.dependencies]
-x11 = "2.21"
+x11 = { version = "2.21", features = ["xlib", "xinerama"] }

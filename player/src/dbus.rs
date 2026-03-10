@@ -75,15 +75,15 @@ async fn register(state: Rc<RefCell<PlayerState>>) {
                     invocation.return_value(None);
                 }
                 "Pause" => {
-                    player::pause_all(&st);
+                    player::pause_all(&mut st);
                     invocation.return_value(None);
                 }
                 "Resume" => {
-                    player::resume_all(&st);
+                    player::resume_all(&mut st);
                     invocation.return_value(None);
                 }
                 "Stop" => {
-                    player::stop_all(&st);
+                    player::stop_all(&mut st);
                     invocation.return_value(None);
                 }
                 "GetMonitors" => {

@@ -7,13 +7,21 @@ use libmpv::Mpv;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::window_monitor::{X11WindowMonitor, WindowStateMonitor};
+
 // ── Per-monitor player ────────────────────────────────────────────────────────
 
 struct MonitorPlayer {
     window: gtk::ApplicationWindow,
     mpv: Option<Mpv>,
-    /// Geometry at creation time (for logging).
     connector: String,
+    /// Monitor geometry for overlap detection.
+    geo_x: i32,
+    geo_y: i32,
+    geo_w: i32,
+    geo_h: i32,
+    /// Whether playback is paused due to a covered window (not user-initiated).
+    auto_paused: bool,
 }
 
 impl MonitorPlayer {
@@ -31,7 +39,6 @@ impl MonitorPlayer {
             .decorated(false)
             .build();
 
-        // Position the window on this monitor's origin after realize.
         let x = geo.x();
         let y = geo.y();
         let w = geo.width();
@@ -46,6 +53,11 @@ impl MonitorPlayer {
             window,
             mpv: None,
             connector: connector.to_string(),
+            geo_x: geo.x(),
+            geo_y: geo.y(),
+            geo_w: geo.width(),
+            geo_h: geo.height(),
+            auto_paused: false,
         }
     }
 
@@ -55,10 +67,7 @@ impl MonitorPlayer {
             match create_mpv(xid) {
                 Ok(mpv) => self.mpv = Some(mpv),
                 Err(e) => {
-                    eprintln!(
-                        "[aurora-player][{}] Failed to create mpv: {e}",
-                        self.connector
-                    );
+                    eprintln!("[aurora-player][{}] Failed to create mpv: {e}", self.connector);
                     return;
                 }
             }
@@ -67,6 +76,7 @@ impl MonitorPlayer {
             if let Err(e) = mpv.command("loadfile", &[path, "replace"]) {
                 eprintln!("[aurora-player][{}] loadfile error: {e}", self.connector);
             } else {
+                self.auto_paused = false;
                 println!("[aurora-player][{}] Playing: {path}", self.connector);
             }
         }
@@ -84,10 +94,15 @@ impl MonitorPlayer {
         }
     }
 
-    fn stop(&self) {
+    fn stop(&mut self) {
         if let Some(mpv) = &self.mpv {
             let _: Result<(), _> = mpv.command("stop", &[] as &[&str]);
         }
+        self.auto_paused = false;
+    }
+
+    fn is_playing(&self) -> bool {
+        self.mpv.is_some()
     }
 }
 
@@ -96,7 +111,6 @@ impl MonitorPlayer {
 pub struct PlayerState {
     pub app: gtk::Application,
     pub monitors: Vec<MonitorPlayer>,
-    /// Last played path so new monitors can pick it up automatically.
     pub current_path: Option<String>,
 }
 
@@ -108,16 +122,13 @@ impl PlayerState {
             current_path: None,
         }));
 
-        // Build initial windows.
         Self::rebuild_monitors(&state);
-
-        // Watch for monitor changes.
         Self::watch_monitors(&state);
+        Self::start_auto_pause_loop(&state);
 
         state
     }
 
-    /// Destroy all windows and recreate one per connected monitor.
     fn rebuild_monitors(state: &Rc<RefCell<Self>>) {
         let display = gdk::Display::default().expect("No GDK display");
         let monitor_list = display.monitors();
@@ -127,14 +138,13 @@ impl PlayerState {
 
         let mut st = state.borrow_mut();
 
-        // Close existing windows.
         for mp in st.monitors.drain(..) {
             mp.window.close();
         }
 
         let app = st.app.clone();
         let current_path = st.current_path.clone();
-        drop(st); // release borrow before mutable re-borrow in loop
+        drop(st);
 
         let mut new_monitors: Vec<MonitorPlayer> = Vec::new();
 
@@ -147,7 +157,6 @@ impl PlayerState {
             let mut mp = MonitorPlayer::new(&app, &monitor, i as usize);
             mp.window.present();
 
-            // Resume playback on the new window if something was already playing.
             if let Some(ref path) = current_path {
                 mp.play(path);
             }
@@ -159,31 +168,68 @@ impl PlayerState {
     }
 
     fn watch_monitors(state: &Rc<RefCell<Self>>) {
-    let state_clone = Rc::clone(state);
-    let last_count = Rc::new(RefCell::new(
-        gdk::Display::default()
-            .map(|d| d.monitors().n_items())
-            .unwrap_or(0),
-    ));
+        let state_clone = Rc::clone(state);
+        let last_count = Rc::new(RefCell::new(
+            gdk::Display::default()
+                .map(|d| d.monitors().n_items())
+                .unwrap_or(0),
+        ));
 
-    glib::timeout_add_local(std::time::Duration::from_secs(5), move || {
-        let current = gdk::Display::default()
-            .map(|d| d.monitors().n_items())
-            .unwrap_or(0);
+        glib::timeout_add_local(std::time::Duration::from_secs(5), move || {
+            let current = gdk::Display::default()
+                .map(|d| d.monitors().n_items())
+                .unwrap_or(0);
 
-        let prev = *last_count.borrow();
-        if current != prev {
-            println!("[aurora-player] Monitor count changed {prev} → {current}, rebuilding");
-            *last_count.borrow_mut() = current;
-            Self::rebuild_monitors(&state_clone);
+            let prev = *last_count.borrow();
+            if current != prev {
+                println!("[aurora-player] Monitor count changed {prev} → {current}, rebuilding");
+                *last_count.borrow_mut() = current;
+                Self::rebuild_monitors(&state_clone);
+            }
+
+            glib::ControlFlow::Continue
+        });
+    }
+
+    /// Poll every second — pause monitors with a maximized window, resume the rest.
+    fn start_auto_pause_loop(state: &Rc<RefCell<Self>>) {
+        let state_clone = Rc::clone(state);
+
+        // Open a dedicated X11 connection for window monitoring.
+        let monitor = X11WindowMonitor::new(None);
+        if monitor.is_none() {
+            eprintln!("[aurora-player] Auto-pause disabled: could not open X11 connection");
+            return;
         }
+        let monitor = Rc::new(monitor.unwrap());
 
-        glib::ControlFlow::Continue
-    });
-}
+        glib::timeout_add_local(std::time::Duration::from_millis(1000), move || {
+            let mut st = state_clone.borrow_mut();
+
+            for mp in &mut st.monitors {
+                if !mp.is_playing() {
+                    continue;
+                }
+
+                let covered = monitor.has_covered_window(mp.geo_x, mp.geo_y, mp.geo_w, mp.geo_h);
+
+                if covered && !mp.auto_paused {
+                    mp.pause();
+                    mp.auto_paused = true;
+                    println!("[aurora-player][{}] Auto-paused (window covered)", mp.connector);
+                } else if !covered && mp.auto_paused {
+                    mp.resume();
+                    mp.auto_paused = false;
+                    println!("[aurora-player][{}] Auto-resumed", mp.connector);
+                }
+            }
+
+            glib::ControlFlow::Continue
+        });
+    }
 }
 
-// ── Public API (called from dbus.rs) ─────────────────────────────────────────
+// ── Public API ────────────────────────────────────────────────────────────────
 
 pub fn play_all(state: &mut PlayerState, path: &str) {
     state.current_path = Some(path.to_string());
@@ -200,34 +246,32 @@ pub fn play_on_monitor(state: &mut PlayerState, path: &str, index: usize) {
     }
 }
 
-pub fn pause_all(state: &PlayerState) {
-    for mp in &state.monitors {
+pub fn pause_all(state: &mut PlayerState) {
+    for mp in &mut state.monitors {
         mp.pause();
+        mp.auto_paused = false; // user-initiated, reset auto flag
     }
 }
 
-pub fn resume_all(state: &PlayerState) {
-    for mp in &state.monitors {
+pub fn resume_all(state: &mut PlayerState) {
+    for mp in &mut state.monitors {
         mp.resume();
+        mp.auto_paused = false;
     }
 }
 
-pub fn stop_all(state: &PlayerState) {
-    for mp in &state.monitors {
+pub fn stop_all(state: &mut PlayerState) {
+    for mp in &mut state.monitors {
         mp.stop();
     }
 }
 
-/// Returns a list of (index, connector, widthxheight) strings for DBus.
 pub fn get_monitors(state: &PlayerState) -> Vec<String> {
     state
         .monitors
         .iter()
         .enumerate()
-        .map(|(i, mp)| {
-            let geo = gtk::prelude::WidgetExt::width(&mp.window);
-            format!("{i}:{}", mp.connector)
-        })
+        .map(|(i, mp)| format!("{i}:{}", mp.connector))
         .collect()
 }
 
@@ -246,9 +290,9 @@ fn create_mpv(wid: u64) -> Result<Mpv, String> {
     mpv.set_property("loop-file", "inf")
         .map_err(|e| format!("mpv loop error: {e}"))?;
     mpv.set_property("vo", "gpu")
-    .map_err(|e| format!("mpv vo error: {e}"))?;
+        .map_err(|e| format!("mpv vo error: {e}"))?;
     mpv.set_property("hwdec", "auto-safe")
-    .map_err(|e| format!("mpv hwdec error: {e}"))?;
+        .map_err(|e| format!("mpv hwdec error: {e}"))?;
     mpv.set_property("osc", false)
         .map_err(|e| format!("mpv osc error: {e}"))?;
     mpv.set_property("input-default-bindings", false)
@@ -290,16 +334,14 @@ fn set_desktop_window_hint(
         gdk_x11::ffi::gdk_x11_display_get_xdisplay(
             x11_display.as_ptr() as *mut gdk_x11::ffi::GdkX11Display,
         )
-    } as usize; // usize para mover al closure
+    } as usize;
 
     let connector = connector.to_string();
 
-    // Apply hint immediately.
     unsafe {
         apply_x11_desktop_hint(xdisplay as *mut std::ffi::c_void, xid, x, y, w, h);
     }
 
-    // Re-apply position after WM has processed the window.
     glib::timeout_add_local_once(std::time::Duration::from_millis(300), move || {
         unsafe {
             apply_x11_desktop_hint(xdisplay as *mut std::ffi::c_void, xid, x, y, w, h);
@@ -353,9 +395,7 @@ unsafe fn apply_x11_desktop_hint(
     );
     let desktop_atom = XInternAtom(
         display,
-        CString::new("_NET_WM_WINDOW_TYPE_DESKTOP")
-            .unwrap()
-            .as_ptr(),
+        CString::new("_NET_WM_WINDOW_TYPE_DESKTOP").unwrap().as_ptr(),
         0,
     );
     let atom_type = XInternAtom(display, CString::new("ATOM").unwrap().as_ptr(), 0);
@@ -371,7 +411,6 @@ unsafe fn apply_x11_desktop_hint(
         1,
     );
 
-    // Position and size this window on its specific monitor.
     XMoveResizeWindow(display, xid, x, y, w as u32, h as u32);
     XLowerWindow(display, xid);
     XFlush(display);

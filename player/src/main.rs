@@ -1,5 +1,6 @@
 mod dbus;
 mod player;
+mod window_monitor;
 
 use gtk::prelude::*;
 
