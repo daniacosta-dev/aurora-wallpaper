@@ -85,21 +85,23 @@ The app and player are **separate processes** communicating via DBus. This means
 
 ## Installation
 
+### Quick Install (recommended)
+
+Download the latest release tarball from the [Releases page](https://github.com/daniacosta-dev/aurora-wallpaper/releases/latest):
+```bash
+tar -xzf aurora-video-wallpaper-v1.0.0-linux-x86_64.tar.gz
+cd aurora-video-wallpaper-v1.0.0
+./install.sh
+```
+
 ### Dependencies
 
+The following system libraries are required:
 ```bash
-sudo apt install \
-  libgtk-4-dev \
-  libadwaita-1-dev \
-  libgstreamer1.0-dev \
-  libgstreamer-plugins-base1.0-dev \
-  libmpv-dev \
-  mpv \
-  libgdk4-x11-dev
+sudo apt install libmpv2 libgtk-4-1 libadwaita-1-0
 ```
 
 ### Build from source
-
 ```bash
 git clone https://github.com/daniacosta-dev/aurora-wallpaper
 cd aurora-wallpaper
