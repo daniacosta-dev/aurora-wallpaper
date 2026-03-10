@@ -54,12 +54,18 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
 
     // --- Action bar ---
     let action_bar = gtk::ActionBar::new();
+
+    let stop_btn = gtk::Button::with_label("Stop Wallpaper");
+    stop_btn.add_css_class("destructive-action");
+    stop_btn.add_css_class("pill");
+    action_bar.pack_start(&stop_btn);
+
     let import_btn = gtk::Button::with_label("Import Video");
     import_btn.add_css_class("suggested-action");
     import_btn.add_css_class("pill");
     action_bar.pack_end(&import_btn);
 
-    // --- Content area ---
+    // --- Content area --- 
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
     content.append(&stack);
     content.append(&action_bar);
@@ -74,6 +80,11 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
 
     // --- Populate on startup ---
     refresh_list(&list_box, &stack, &state);
+
+    // --- Stop button ---
+    stop_btn.connect_clicked(move |_| {
+        crate::features::player_control::stop_wallpaper();
+    });
 
     // --- Import button ---
     let window_weak = window.downgrade();

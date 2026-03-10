@@ -81,3 +81,36 @@ fn launch_player() {
         Err(e) => eprintln!("[AuroraWall] Failed to launch player ({binary}): {e}"),
     }
 }
+
+pub fn stop_wallpaper() {
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    std::process::Command::new("pkill")
+    .arg("-f")
+    .arg("aurora-player")
+    .spawn()
+    .ok();
+
+    let conn = match gio::bus_get_sync(gio::BusType::Session, None::<&gio::Cancellable>) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("[AuroraWall] DBus connection error: {e}");
+            return;
+        }
+    };
+
+    let result = conn.call_sync(
+        Some(aurora_shared::DBUS_NAME),
+        aurora_shared::DBUS_PATH,
+        aurora_shared::DBUS_INTERFACE,
+        "Stop",
+        None,
+        None,
+        gio::DBusCallFlags::NONE,
+        2000,
+        None::<&gio::Cancellable>,
+    );
+
+    if let Err(e) = result {
+        eprintln!("[AuroraWall] Stop error: {e}");
+    }
+}
