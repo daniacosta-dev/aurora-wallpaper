@@ -6,6 +6,18 @@ const PLAYER_BINARY: &str = "aurora-player";
 
 /// Launch the player process if it's not already running, then send Play(path).
 pub fn activate_wallpaper(path: &str) {
+    // Enable autostart on first activation.
+if !aurora_shared::AutostartManager::is_enabled() {
+    let player_path = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join("aurora-player")))
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| "aurora-player".to_string());
+
+    if let Err(e) = aurora_shared::AutostartManager::enable(&player_path) {
+        eprintln!("[AuroraWall] Could not enable autostart: {e}");
+    }
+}
     // Persist active wallpaper so the player can resume on next launch.
     if let Ok(storage) = aurora_shared::ActiveWallpaperStorage::new() {
     if let Err(e) = storage.save(&path) {

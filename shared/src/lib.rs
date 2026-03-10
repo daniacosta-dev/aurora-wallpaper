@@ -58,3 +58,51 @@ impl std::fmt::Display for ActiveStorageError {
         }
     }
 }
+
+/// Manages the XDG autostart entry for aurora-player.
+pub struct AutostartManager;
+
+impl AutostartManager {
+    fn desktop_path() -> Option<std::path::PathBuf> {
+        dirs::config_dir().map(|d| d.join("autostart").join("aurora-player.desktop"))
+    }
+
+    pub fn is_enabled() -> bool {
+        Self::desktop_path().map(|p| p.exists()).unwrap_or(false)
+    }
+
+    pub fn enable(player_binary_path: &str) -> Result<(), std::io::Error> {
+        let path = Self::desktop_path().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::NotFound, "No XDG config dir")
+        })?;
+
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+
+        let content = format!(
+            "[Desktop Entry]\n\
+             Type=Application\n\
+             Name=AuroraWall Player\n\
+             Comment=Video wallpaper player for AuroraWall\n\
+             Exec={player_binary_path}\n\
+             Hidden=false\n\
+             NoDisplay=true\n\
+             X-GNOME-Autostart-enabled=true\n"
+        );
+
+        std::fs::write(&path, content)?;
+        println!("[AuroraWall] Autostart enabled: {}", path.display());
+        Ok(())
+    }
+
+    pub fn disable() -> Result<(), std::io::Error> {
+        if let Some(path) = Self::desktop_path() {
+            if path.exists() {
+                std::fs::remove_file(&path)?;
+                println!("[AuroraWall] Autostart disabled");
+            }
+        }
+        Ok(())
+    }
+}
