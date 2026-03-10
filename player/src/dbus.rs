@@ -12,18 +12,21 @@ const DBUS_INTERFACE_XML: &str = r#"
     <method name="Play">
       <arg type="s" direction="in" name="path"/>
     </method>
+    <method name="PlayOnMonitor">
+      <arg type="s" direction="in" name="path"/>
+      <arg type="u" direction="in" name="monitor_index"/>
+    </method>
     <method name="Pause"/>
+    <method name="Resume"/>
     <method name="Stop"/>
+    <method name="GetMonitors">
+      <arg type="as" direction="out" name="monitors"/>
+    </method>
   </interface>
 </node>
 "#;
 
-pub fn start_dbus_service(window: gtk::ApplicationWindow) {
-    let state = Rc::new(RefCell::new(PlayerState {
-        window,
-        mpv: Rc::new(RefCell::new(None)),
-    }));
-
+pub fn start_dbus_service(state: Rc<RefCell<PlayerState>>) {
     glib::MainContext::default().spawn_local(async move {
         register(state).await;
     });
@@ -56,21 +59,39 @@ async fn register(state: Rc<RefCell<PlayerState>>) {
         "/dev/daniacosta/AuroraWall/Player",
         &interface_info,
         move |_conn, _sender, _path, _interface, method, params, invocation| {
-            let st = state_for_methods.borrow();
+            let mut st = state_for_methods.borrow_mut();
             match method {
                 "Play" => {
                     let path: String = params.child_value(0).get().unwrap_or_default();
                     println!("[aurora-player] DBus Play: {path}");
-                    player::play(&st, &path);
+                    player::play_all(&mut st, &path);
+                    invocation.return_value(None);
+                }
+                "PlayOnMonitor" => {
+                    let path: String = params.child_value(0).get().unwrap_or_default();
+                    let index: u32 = params.child_value(1).get().unwrap_or(0);
+                    println!("[aurora-player] DBus PlayOnMonitor: {path} @ monitor {index}");
+                    player::play_on_monitor(&mut st, &path, index as usize);
                     invocation.return_value(None);
                 }
                 "Pause" => {
-                    player::pause(&st);
+                    player::pause_all(&st);
+                    invocation.return_value(None);
+                }
+                "Resume" => {
+                    player::resume_all(&st);
                     invocation.return_value(None);
                 }
                 "Stop" => {
-                    player::stop(&st);
+                    player::stop_all(&st);
                     invocation.return_value(None);
+                }
+                "GetMonitors" => {
+                    let monitors = player::get_monitors(&st);
+                    let variant = glib::Variant::array_from_iter::<String>(
+                        monitors.iter().map(|s| glib::Variant::from(s.as_str())),
+                    );
+                    invocation.return_value(Some(&glib::Variant::tuple_from_iter([variant])));
                 }
                 _ => {
                     invocation.return_error(
