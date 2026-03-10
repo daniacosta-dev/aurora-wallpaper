@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "app",
+    "player",
+    "shared",
+]
+resolver = "2"
