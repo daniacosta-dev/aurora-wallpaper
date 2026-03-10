@@ -5,7 +5,12 @@
 <img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" />
 <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
 
-# 🌌 Aurora Video Wallpaper
+<p align="center">
+  <br>
+  <img src="assets/aurora-wallpaper.svg" width="128" height="128" alt="Aurora Video Wallpaper">
+</p>
+
+# Aurora Video Wallpaper
 
 **Animated video wallpaper manager for Linux & GNOME**
 
@@ -15,9 +20,8 @@
 
 </div>
 
----
-como 
-## What is AuroraWall?
+--- 
+## What is Aurora Video Wallpaper?
 
 AuroraWall lets you set any video as your desktop wallpaper on Linux. Built with Rust and GTK4, it's designed to be fast, memory-efficient, and multi-monitor aware — without compromising your system's performance.
 

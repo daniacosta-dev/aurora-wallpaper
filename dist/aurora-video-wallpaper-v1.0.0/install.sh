@@ -47,12 +47,30 @@ chmod +x "$INSTALL_DIR/aurora-player"
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.zshrc" 2>/dev/null || true
-    echo "ℹ  Added ~/.local/bin to PATH — restart your terminal or run:"
-    echo "   export PATH=\"\$HOME/.local/bin:\$PATH\""
 fi
+
+# ── Desktop entry ─────────────────────────────────────────────────────────────
+
+DESKTOP_DIR="$HOME/.local/share/applications"
+mkdir -p "$DESKTOP_DIR"
+
+cat > "$DESKTOP_DIR/aurora-wallpaper.desktop" << DESKTOP
+[Desktop Entry]
+Name=Aurora Video Wallpaper
+Comment=Animated video wallpaper manager for GNOME
+Exec=$HOME/.local/bin/aurora-wallpaper
+Icon=video-display
+Type=Application
+Categories=Utility;GTK;
+Keywords=wallpaper;video;animated;background;
+DESKTOP
+
+echo "Desktop entry created — Aurora Video Wallpaper will appear in your app launcher."
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 
 echo ""
 echo "✅ Aurora Video Wallpaper installed successfully!"
-echo "   Run: aurora-wallpaper"
+echo ""
+echo "Launch from your app launcher, or run:"
+echo "   $INSTALL_DIR/aurora-wallpaper"
