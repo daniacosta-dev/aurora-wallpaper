@@ -5,7 +5,7 @@
 <img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" />
 <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" />
 
-# 🌌 Aurora Wallpaper
+# 🌌 Aurora Video Wallpaper
 
 **Animated video wallpaper manager for Linux & GNOME**
 

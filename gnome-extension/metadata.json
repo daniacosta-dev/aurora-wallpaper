@@ -1,6 +1,6 @@
 {
   "uuid": "aurorawall@daniacosta.dev",
-  "name": "Aurora Wallpaper",
+  "name": "Aurora Video Wallpaper",
   "description": "Video wallpaper renderer for AuroraWall. Receives video paths via DBus and renders them behind the desktop.",
   "version": 1,
   "shell-version": ["46"],
