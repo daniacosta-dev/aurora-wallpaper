@@ -247,7 +247,7 @@ fn create_mpv(wid: u64) -> Result<Mpv, String> {
         .map_err(|e| format!("mpv loop error: {e}"))?;
     mpv.set_property("vo", "gpu")
     .map_err(|e| format!("mpv vo error: {e}"))?;
-    mpv.set_property("hwdec", "auto")
+    mpv.set_property("hwdec", "auto-safe")
     .map_err(|e| format!("mpv hwdec error: {e}"))?;
     mpv.set_property("osc", false)
         .map_err(|e| format!("mpv osc error: {e}"))?;
