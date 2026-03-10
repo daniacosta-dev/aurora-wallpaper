@@ -3,7 +3,7 @@ name = "aurora-player"
 version = "0.1.0"
 edition = "2021"
 description = "Video renderer process for Aurora Wallpaper"
-license = "GPL-3.0"
+license = "MIT"
 
 [[bin]]
 name = "aurora-player"

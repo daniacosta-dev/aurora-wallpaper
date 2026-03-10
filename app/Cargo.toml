@@ -3,7 +3,7 @@ name = "aurora-wallpaper"
 version = "0.1.0"
 edition = "2021"
 description = "Animated video wallpaper manager for Linux / GNOME"
-license = "GPL-3.0"
+license = "MIT"
 
 [[bin]]
 name = "aurora-wallpaper"
