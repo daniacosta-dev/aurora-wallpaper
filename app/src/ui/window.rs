@@ -65,14 +65,14 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     import_btn.add_css_class("pill");
     action_bar.pack_end(&import_btn);
 
-    // --- Content area --- 
+    // --- Content area ---
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
     content.append(&stack);
     content.append(&action_bar);
 
     // --- Main layout ---
     let main_box = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    let header = build_header_bar();
+    let (header, settings_btn) = build_header_bar();
     main_box.append(&header);
     main_box.append(&content);
 
@@ -86,14 +86,23 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
         crate::features::player_control::stop_wallpaper();
     });
 
-    // --- Import button ---
+    // --- Settings button ---
     let window_weak = window.downgrade();
+    settings_btn.connect_clicked(move |_| {
+        let Some(win) = window_weak.upgrade() else {
+            return;
+        };
+        show_settings_dialog(&win);
+    });
+
+    // --- Import button ---
+    let window_weak2 = window.downgrade();
     let state_clone = Rc::clone(&state);
     let list_clone = list_box.clone();
     let stack_clone = stack.clone();
 
     import_btn.connect_clicked(move |_| {
-        let Some(win) = window_weak.upgrade() else {
+        let Some(win) = window_weak2.upgrade() else {
             return;
         };
 
@@ -159,10 +168,114 @@ pub fn build_window(app: &adw::Application) -> adw::ApplicationWindow {
     window
 }
 
+/// Shows the settings dialog.
+fn show_settings_dialog(parent: &adw::ApplicationWindow) {
+    let config_storage = match aurora_shared::AppConfigStorage::new() {
+        Some(s) => s,
+        None => return,
+    };
+    let config = config_storage.load();
+
+    let dialog = gtk::Dialog::builder()
+        .title("Settings")
+        .transient_for(parent)
+        .modal(true)
+        .default_width(400)
+        .build();
+
+    dialog.add_button("Close", gtk::ResponseType::Close);
+    dialog.add_button("Apply", gtk::ResponseType::Apply);
+
+    let content = dialog.content_area();
+    content.set_spacing(0);
+    content.set_margin_top(12);
+    content.set_margin_bottom(12);
+    content.set_margin_start(16);
+    content.set_margin_end(16);
+
+    // --- Performance section ---
+    let section_label = gtk::Label::new(Some("Performance"));
+    section_label.add_css_class("heading");
+    section_label.set_halign(gtk::Align::Start);
+    section_label.set_margin_bottom(8);
+    content.append(&section_label);
+
+    let perf_list = gtk::ListBox::new();
+    perf_list.add_css_class("boxed-list");
+    perf_list.set_selection_mode(gtk::SelectionMode::None);
+    perf_list.set_margin_bottom(16);
+
+    // Default mode row.
+    let default_row = adw::ActionRow::new();
+    default_row.set_title("Default");
+    default_row.set_subtitle("Uses integrated GPU — lower power consumption");
+    let default_radio = gtk::CheckButton::new();
+    default_radio.set_valign(gtk::Align::Center);
+    default_row.add_suffix(&default_radio);
+    default_row.set_activatable_widget(Some(&default_radio));
+
+    // High performance mode row.
+    let perf_row = adw::ActionRow::new();
+    perf_row.set_title("High Performance");
+    perf_row.set_subtitle("Uses dedicated GPU (NVIDIA) — better decoding, higher power use");
+    let perf_radio = gtk::CheckButton::new();
+    perf_radio.set_valign(gtk::Align::Center);
+    perf_radio.set_group(Some(&default_radio));
+    perf_row.add_suffix(&perf_radio);
+    perf_row.set_activatable_widget(Some(&perf_radio));
+
+    // Disable High Performance option if no NVIDIA GPU is available.
+    if !std::path::Path::new("/dev/nvidia0").exists() {
+        perf_radio.set_sensitive(false);
+        perf_row.set_subtitle("Uses dedicated GPU (NVIDIA) — not available on this system");
+    }
+
+    // Set initial state.
+    if config.high_performance {
+        perf_radio.set_active(true);
+    } else {
+        default_radio.set_active(true);
+    }
+
+    perf_list.append(&default_row);
+    perf_list.append(&perf_row);
+    content.append(&perf_list);
+
+    // --- Note ---
+    let note = gtk::Label::new(Some(
+        "Changes take effect the next time the wallpaper is activated.",
+    ));
+    note.add_css_class("dim-label");
+    note.add_css_class("caption");
+    note.set_halign(gtk::Align::Start);
+    note.set_wrap(true);
+    content.append(&note);
+
+    // --- Save on toggle ---
+    perf_radio.connect_toggled(move |btn| {
+        let high_performance = btn.is_active();
+        let mut cfg = config_storage.load();
+        cfg.high_performance = high_performance;
+        if let Err(e) = config_storage.save(&cfg) {
+            eprintln!("[AuroraWall] Could not save config: {e}");
+        } else {
+            println!(
+                "[AuroraWall] Performance mode: {}",
+                if high_performance { "high" } else { "default" }
+            );
+        }
+    });
+
+    dialog.connect_response(|d, response| {
+    if response == gtk::ResponseType::Apply {
+        crate::features::player_control::restart_player();
+    }
+    d.close();
+    });
+    dialog.show();
+}
+
 /// Rebuild the list from current state.
-///
-/// Takes the full `Rc<RefCell<AppState>>` so it can also wire up
-/// the remove callback for each new card.
 fn refresh_list(list_box: &gtk::ListBox, stack: &gtk::Stack, state: &Rc<RefCell<AppState>>) {
     while let Some(child) = list_box.first_child() {
         list_box.remove(&child);
@@ -174,7 +287,6 @@ fn refresh_list(list_box: &gtk::ListBox, stack: &gtk::Stack, state: &Rc<RefCell<
         return;
     }
 
-    // Collect IDs first to avoid holding the borrow while building cards.
     let wallpapers: Vec<_> = state.borrow().library.all().to_vec();
 
     for wallpaper in &wallpapers {
@@ -188,7 +300,6 @@ fn refresh_list(list_box: &gtk::ListBox, stack: &gtk::Stack, state: &Rc<RefCell<
                 crate::features::player_control::activate_wallpaper(&path);
             },
             move |id| {
-                // Nombre del wallpaper para el mensaje.
                 let name = state_for_card
                     .borrow()
                     .library

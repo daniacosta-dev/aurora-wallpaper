@@ -5,7 +5,61 @@ pub const DBUS_NAME: &str = "dev.daniacosta.AuroraWall.Player";
 pub const DBUS_PATH: &str = "/dev/daniacosta/AuroraWall/Player";
 pub const DBUS_INTERFACE: &str = "dev.daniacosta.AuroraWall.Player";
 
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+// ── AppConfig ─────────────────────────────────────────────────────────────────
+
+/// Application configuration.
+/// Storage: ~/.local/share/aurorawall/config.json
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppConfig {
+    /// Use dedicated GPU (NVIDIA PRIME offload) for playback.
+    /// false = default (integrated GPU), true = high performance (dedicated GPU).
+    pub high_performance: bool,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            high_performance: false,
+        }
+    }
+}
+
+pub struct AppConfigStorage {
+    path: PathBuf,
+}
+
+impl AppConfigStorage {
+    pub fn new() -> Option<Self> {
+        let path = dirs::data_local_dir()?
+            .join("aurorawall")
+            .join("config.json");
+        Some(Self { path })
+    }
+
+    pub fn load(&self) -> AppConfig {
+        std::fs::read_to_string(&self.path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
+    }
+
+    pub fn save(&self, config: &AppConfig) -> Result<(), std::io::Error> {
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let content = serde_json::to_string_pretty(config)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        let tmp = self.path.with_extension("json.tmp");
+        std::fs::write(&tmp, &content)?;
+        std::fs::rename(&tmp, &self.path)?;
+        Ok(())
+    }
+}
+
+// ── ActiveWallpaperStorage ────────────────────────────────────────────────────
 
 /// Persists the currently active wallpaper path.
 /// Storage: ~/.local/share/aurorawall/active.json
@@ -18,7 +72,9 @@ impl ActiveWallpaperStorage {
         let data_dir = dirs::data_local_dir()
             .ok_or(ActiveStorageError::NoDataDir)?
             .join("aurorawall");
-        Ok(Self { path: data_dir.join("active.json") })
+        Ok(Self {
+            path: data_dir.join("active.json"),
+        })
     }
 
     pub fn load(&self) -> Option<String> {
@@ -52,12 +108,16 @@ pub enum ActiveStorageError {
 impl std::fmt::Display for ActiveStorageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ActiveStorageError::NoDataDir => write!(f, "Could not determine XDG data directory"),
+            ActiveStorageError::NoDataDir => {
+                write!(f, "Could not determine XDG data directory")
+            }
             ActiveStorageError::Io(e) => write!(f, "I/O error: {e}"),
             ActiveStorageError::Json(e) => write!(f, "JSON error: {e}"),
         }
     }
 }
+
+// ── AutostartManager ──────────────────────────────────────────────────────────
 
 /// Manages the XDG autostart entry for aurora-player.
 pub struct AutostartManager;

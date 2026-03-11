@@ -7,20 +7,21 @@ const PLAYER_BINARY: &str = "aurora-player";
 /// Launch the player process if it's not already running, then send Play(path).
 pub fn activate_wallpaper(path: &str) {
     // Enable autostart on first activation.
-if !aurora_shared::AutostartManager::is_enabled() {
-    let player_path = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|d| d.join("aurora-player")))
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|| "aurora-player".to_string());
+    if !aurora_shared::AutostartManager::is_enabled() {
+        let player_path = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.join("aurora-player")))
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "aurora-player".to_string());
 
-    if let Err(e) = aurora_shared::AutostartManager::enable(&player_path) {
-        eprintln!("[AuroraWall] Could not enable autostart: {e}");
+        if let Err(e) = aurora_shared::AutostartManager::enable(&player_path) {
+            eprintln!("[AuroraWall] Could not enable autostart: {e}");
+        }
     }
-}
+
     // Persist active wallpaper so the player can resume on next launch.
     if let Ok(storage) = aurora_shared::ActiveWallpaperStorage::new() {
-    if let Err(e) = storage.save(&path) {
+        if let Err(e) = storage.save(&path) {
             eprintln!("[AuroraWall] Could not persist active wallpaper: {e}");
         }
     }
@@ -65,6 +66,11 @@ async fn send_play(path: &str) -> Result<(), glib::Error> {
         })
 }
 
+/// Returns true if a discrete NVIDIA GPU is available for offloading.
+fn is_nvidia_available() -> bool {
+    std::path::Path::new("/dev/nvidia0").exists()
+}
+
 fn launch_player() {
     let exe_dir = std::env::current_exe()
         .ok()
@@ -76,20 +82,33 @@ fn launch_player() {
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|| PLAYER_BINARY.to_string());
 
-    match std::process::Command::new(&binary).spawn() {
+    // Read user config to determine performance mode.
+    let high_performance = aurora_shared::AppConfigStorage::new()
+        .map(|s| s.load().high_performance)
+        .unwrap_or(false);
+
+    let result = if high_performance && is_nvidia_available() {
+        println!("[AuroraWall] High Performance mode — launching player with NVIDIA GPU offload");
+        std::process::Command::new(&binary)
+            .env("__NV_PRIME_RENDER_OFFLOAD", "1")
+            .env("__GLX_VENDOR_LIBRARY_NAME", "nvidia")
+            .env("__VK_LAYER_NV_optimus", "NVIDIA_only")
+            .spawn()
+    } else {
+        if high_performance && !is_nvidia_available() {
+            println!("[AuroraWall] High Performance requested but no NVIDIA GPU found, using default");
+        }
+        std::process::Command::new(&binary).spawn()
+    };
+
+    match result {
         Ok(_) => println!("[AuroraWall] Launched player: {binary}"),
         Err(e) => eprintln!("[AuroraWall] Failed to launch player ({binary}): {e}"),
     }
 }
 
 pub fn stop_wallpaper() {
-    std::thread::sleep(std::time::Duration::from_millis(200));
-    std::process::Command::new("pkill")
-    .arg("-f")
-    .arg("aurora-player")
-    .spawn()
-    .ok();
-
+    // Send DBus Stop first so the player can clean up active.json.
     let conn = match gio::bus_get_sync(gio::BusType::Session, None::<&gio::Cancellable>) {
         Ok(c) => c,
         Err(e) => {
@@ -98,7 +117,7 @@ pub fn stop_wallpaper() {
         }
     };
 
-    let result = conn.call_sync(
+    let _ = conn.call_sync(
         Some(aurora_shared::DBUS_NAME),
         aurora_shared::DBUS_PATH,
         aurora_shared::DBUS_INTERFACE,
@@ -110,7 +129,39 @@ pub fn stop_wallpaper() {
         None::<&gio::Cancellable>,
     );
 
-    if let Err(e) = result {
-        eprintln!("[AuroraWall] Stop error: {e}");
-    }
+    // Give the player a moment to clean up then kill it.
+    std::thread::sleep(std::time::Duration::from_millis(200));
+    std::process::Command::new("pkill")
+        .arg("-f")
+        .arg("aurora-player")
+        .spawn()
+        .ok();
+}
+
+pub fn restart_player() {
+    // Kill existing player.
+    std::process::Command::new("pkill")
+        .arg("-f")
+        .arg("aurora-player")
+        .spawn()
+        .ok();
+
+    // Wait for it to die.
+    std::thread::sleep(std::time::Duration::from_millis(300));
+
+    // Relaunch with current config.
+    launch_player();
+
+    // Resume last wallpaper via DBus after player registers.
+    glib::MainContext::default().spawn_local(async move {
+        glib::timeout_future(std::time::Duration::from_millis(800)).await;
+
+        if let Some(storage) = aurora_shared::ActiveWallpaperStorage::new().ok() {
+            if let Some(path) = storage.load() {
+                if let Err(e) = send_play(&path).await {
+                    eprintln!("[AuroraWall] Could not resume after restart: {e}");
+                }
+            }
+        }
+    });
 }

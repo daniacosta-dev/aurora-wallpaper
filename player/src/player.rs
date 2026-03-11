@@ -285,6 +285,8 @@ fn create_mpv(wid: u64) -> Result<Mpv, String> {
 
     let mpv = Mpv::new().map_err(|e| format!("mpv init error: {e}"))?;
 
+    mpv.set_property("gpu-dumb-mode", true)
+    .map_err(|e| format!("mpv gpu-dumb-mode error: {e}"))?;
     mpv.set_property("wid", wid as i64)
         .map_err(|e| format!("mpv wid error: {e}"))?;
     mpv.set_property("loop-file", "inf")

@@ -2,15 +2,20 @@ use adw::prelude::*;
 use gtk::prelude::*;
 
 /// Builds the application header bar.
-///
-/// Returns the `adw::HeaderBar` widget — the caller places it in the window.
-/// Callback-based design: the caller wires up signals, keeping this widget dumb.
-pub fn build_header_bar() -> adw::HeaderBar {
+/// Returns (HeaderBar, settings_button) — the caller wires up signals.
+pub fn build_header_bar() -> (adw::HeaderBar, gtk::Button) {
     let header = adw::HeaderBar::new();
 
-    // Title widget — using AdwWindowTitle for the two-line style.
-    let title = adw::WindowTitle::new("Aurora Video Wallpaper", "Video Wallpaper Manager for Linux");
+    let title = adw::WindowTitle::new(
+        "Aurora Video Wallpaper",
+        "Video Wallpaper Manager for Linux",
+    );
     header.set_title_widget(Some(&title));
 
-    header
+    // Settings button.
+    let settings_btn = gtk::Button::from_icon_name("preferences-system-symbolic");
+    settings_btn.set_tooltip_text(Some("Settings"));
+    header.pack_end(&settings_btn);
+
+    (header, settings_btn)
 }
