@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Aurora Video Wallpaper
+Comment=Animated video wallpaper manager for GNOME
+Exec=/usr/bin/aurora-wallpaper
+Icon=aurora-wallpaper
+Type=Application
+Categories=Utility;GTK;
+Keywords=wallpaper;video;animated;background;

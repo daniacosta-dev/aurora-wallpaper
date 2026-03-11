@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background gradient: deep space dark blue -->
+    <radialGradient id="bgGrad" cx="50%" cy="60%" r="70%">
+      <stop offset="0%" stop-color="#0d1b3e"/>
+      <stop offset="100%" stop-color="#050a1a"/>
+    </radialGradient>
+
+    <!-- Aurora glow gradient (green/teal/purple) -->
+    <linearGradient id="aurora1" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#00ffc8" stop-opacity="0.0"/>
+      <stop offset="30%"  stop-color="#00ffc8" stop-opacity="0.9"/>
+      <stop offset="60%"  stop-color="#a855f7" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#ec4899" stop-opacity="0.0"/>
+    </linearGradient>
+    <linearGradient id="aurora2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#06b6d4" stop-opacity="0.0"/>
+      <stop offset="25%"  stop-color="#06b6d4" stop-opacity="0.7"/>
+      <stop offset="55%"  stop-color="#7c3aed" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#f472b6" stop-opacity="0.0"/>
+    </linearGradient>
+    <linearGradient id="aurora3" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"   stop-color="#34d399" stop-opacity="0.0"/>
+      <stop offset="40%"  stop-color="#34d399" stop-opacity="0.5"/>
+      <stop offset="70%"  stop-color="#818cf8" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#818cf8" stop-opacity="0.0"/>
+    </linearGradient>
+
+    <!-- Star glow -->
+    <radialGradient id="starGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Play button gradient -->
+    <linearGradient id="playGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#a5f3fc" stop-opacity="0.85"/>
+    </linearGradient>
+
+    <!-- Play button glow -->
+    <filter id="playGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Soft blur for aurora bands -->
+    <filter id="auroraBlur">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+    <filter id="auroraBlur2">
+      <feGaussianBlur stdDeviation="10"/>
+    </filter>
+
+    <!-- Round clip -->
+    <clipPath id="roundClip">
+      <rect x="0" y="0" width="512" height="512" rx="96" ry="96"/>
+    </clipPath>
+  </defs>
+
+  <!-- Rounded background -->
+  <rect x="0" y="0" width="512" height="512" rx="96" ry="96" fill="url(#bgGrad)"/>
+
+  <g clip-path="url(#roundClip)">
+    <!-- Stars scattered in sky -->
+    <circle cx="60"  cy="55"  r="1.5" fill="white" opacity="0.8"/>
+    <circle cx="130" cy="38"  r="1"   fill="white" opacity="0.6"/>
+    <circle cx="200" cy="62"  r="1.5" fill="white" opacity="0.7"/>
+    <circle cx="290" cy="44"  r="1"   fill="white" opacity="0.5"/>
+    <circle cx="370" cy="70"  r="1.5" fill="white" opacity="0.9"/>
+    <circle cx="440" cy="40"  r="1"   fill="white" opacity="0.6"/>
+    <circle cx="480" cy="80"  r="1.5" fill="white" opacity="0.7"/>
+    <circle cx="95"  cy="100" r="1"   fill="white" opacity="0.4"/>
+    <circle cx="420" cy="110" r="1.5" fill="white" opacity="0.5"/>
+    <circle cx="320" cy="90"  r="1"   fill="white" opacity="0.6"/>
+    <circle cx="160" cy="110" r="1"   fill="white" opacity="0.5"/>
+    <circle cx="50"  cy="140" r="1.5" fill="white" opacity="0.3"/>
+    <circle cx="470" cy="150" r="1"   fill="white" opacity="0.4"/>
+
+    <!-- Aurora band 3 (bottom, wide, soft) -->
+    <ellipse cx="256" cy="310" rx="320" ry="55"
+             fill="url(#aurora3)" filter="url(#auroraBlur2)" opacity="0.5"/>
+
+    <!-- Aurora band 2 (middle) -->
+    <ellipse cx="230" cy="255" rx="290" ry="38"
+             fill="url(#aurora2)" filter="url(#auroraBlur)" opacity="0.75"/>
+
+    <!-- Aurora band 1 (main, crisp) -->
+    <ellipse cx="260" cy="215" rx="270" ry="28"
+             fill="url(#aurora1)" filter="url(#auroraBlur)" opacity="0.9"/>
+
+    <!-- Subtle horizon mountain silhouette -->
+    <path d="M0,370 L60,290 L110,340 L170,265 L230,310 L280,260 L340,300 L390,255 L450,290 L512,270 L512,512 L0,512 Z"
+          fill="#0a1628" opacity="0.95"/>
+    <path d="M0,395 L80,340 L140,370 L200,330 L260,355 L320,325 L380,350 L440,320 L512,345 L512,512 L0,512 Z"
+          fill="#07111f" opacity="1"/>
+
+    <!-- Ground / dark base -->
+    <rect x="0" y="420" width="512" height="92" fill="#050a1a"/>
+
+    <!-- Reflection glow on ground -->
+    <ellipse cx="256" cy="425" rx="180" ry="18"
+             fill="#00ffc8" opacity="0.06" filter="url(#auroraBlur2)"/>
+
+    <!-- Play button circle -->
+    <circle cx="256" cy="256" r="72" fill="#0d1b3e" opacity="0.55"/>
+    <circle cx="256" cy="256" r="72" fill="none" stroke="white" stroke-opacity="0.25" stroke-width="1.5"/>
+
+    <!-- Play triangle -->
+    <polygon points="240,224 240,288 300,256"
+             fill="url(#playGrad)" filter="url(#playGlow)"/>
+  </g>
+</svg>

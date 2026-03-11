@@ -1,0 +1,10 @@
+Package: aurora-video-wallpaper
+Version: 1.0.0
+Section: utils
+Priority: optional
+Architecture: amd64
+Depends: libmpv2, libgtk-4-1, libadwaita-1-0
+Maintainer: Dania Costa <tu@email.com>
+Description: Aurora Video Wallpaper
+ Animated video wallpaper manager for Linux / GNOME.
+ Supports multi-monitor, hardware decoding, and auto-pause.
