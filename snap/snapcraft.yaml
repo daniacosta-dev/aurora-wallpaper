@@ -1,0 +1,32 @@
+name: aurora-video-wallpaper
+base: core22
+version: '1.0.0'
+summary: Animated video wallpaper manager for Linux / GNOME
+description: |
+  Set animated video wallpapers on Linux / GNOME with multi-monitor support.
+  Features hardware decoding via libmpv, auto-pause when windows are maximized,
+  and supports MP4, WebM, MOV and MKV formats.
+
+grade: stable
+confinement: classic
+
+apps:
+  aurora-wallpaper:
+    command: bin/aurora-wallpaper
+    desktop: usr/share/applications/aurora-wallpaper.desktop
+  aurora-player:
+    command: bin/aurora-player
+
+parts:
+  aurora:
+    plugin: dump
+    source: .
+    organize:
+      target/release/aurora-wallpaper: bin/aurora-wallpaper
+      target/release/aurora-player: bin/aurora-player
+      assets/aurora-wallpaper.svg: usr/share/icons/hicolor/scalable/apps/aurora-wallpaper.svg
+      snap/local/aurora-wallpaper.desktop: usr/share/applications/aurora-wallpaper.desktop
+    stage-packages:
+      - libmpv1
+      - libgtk-4-1
+      - libadwaita-1-0

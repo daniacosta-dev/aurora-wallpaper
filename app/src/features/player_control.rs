@@ -4,16 +4,40 @@ use gtk::glib;
 
 const PLAYER_BINARY: &str = "aurora-player";
 
+/// Returns the correct path to aurora-player depending on the install method.
+fn resolve_player_binary() -> String {
+    // Running as a snap — use the public snap command name.
+    if std::env::var("SNAP").is_ok() {
+        return "aurora-video-wallpaper.aurora-player".to_string();
+    }
+
+    // Otherwise, look next to the current executable.
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join(PLAYER_BINARY)))
+        .filter(|p| p.exists())
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| PLAYER_BINARY.to_string())
+}
+
+/// Returns the correct autostart Exec path for aurora-player.
+fn resolve_autostart_path() -> String {
+    if std::env::var("SNAP").is_ok() {
+        return "/snap/bin/aurora-video-wallpaper.aurora-player".to_string();
+    }
+
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.join(PLAYER_BINARY)))
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| PLAYER_BINARY.to_string())
+}
+
 /// Launch the player process if it's not already running, then send Play(path).
 pub fn activate_wallpaper(path: &str) {
     // Enable autostart on first activation.
     if !aurora_shared::AutostartManager::is_enabled() {
-        let player_path = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|d| d.join("aurora-player")))
-            .map(|p| p.to_string_lossy().to_string())
-            .unwrap_or_else(|| "aurora-player".to_string());
-
+        let player_path = resolve_autostart_path();
         if let Err(e) = aurora_shared::AutostartManager::enable(&player_path) {
             eprintln!("[AuroraWall] Could not enable autostart: {e}");
         }
@@ -72,15 +96,7 @@ fn is_nvidia_available() -> bool {
 }
 
 fn launch_player() {
-    let exe_dir = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|d| d.to_path_buf()));
-
-    let binary = exe_dir
-        .map(|d| d.join(PLAYER_BINARY))
-        .filter(|p| p.exists())
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|| PLAYER_BINARY.to_string());
+    let binary = resolve_player_binary();
 
     // Read user config to determine performance mode.
     let high_performance = aurora_shared::AppConfigStorage::new()
